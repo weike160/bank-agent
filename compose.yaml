@@ -1,0 +1,10 @@
+services:
+  mock-bank:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - bank-data:/data
+
+volumes:
+  bank-data:
