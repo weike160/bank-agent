@@ -1,0 +1,28 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Python 3.12 / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Run tests
+        run: |
+          uv run python -m unittest discover -s mock_bank -p "test_*.py"
+          uv run python -m unittest discover -s bank_gateway -p "test_*.py"
+          uv run python -m unittest discover -s actions -p "test_*.py"
+          uv run python -m unittest discover -s tools -p "test_*.py"
+          uv run python -m unittest discover -s bank_agent -p "test_*.py"

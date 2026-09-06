@@ -5,11 +5,14 @@ from pathlib import Path
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 from dotenv import load_dotenv
+from prompt_toolkit import PromptSession
+from prompt_toolkit.history import FileHistory
 
 from actions import OTPVerifier
 from bank_agent.agent import BankAgent
 from bank_agent.model import OpenAICompatibleModel
 from bank_agent.prompts import SYSTEM_PROMPT
+from bank_agent.trace import TraceLogger
 from bank_gateway import BankGateway
 from tools import BankingTools, create_bank_action_service, create_banking_tool_registry
 
@@ -41,16 +44,33 @@ def main():
         system_prompt=SYSTEM_PROMPT,
     )
     connection = sqlite3.connect(ROOT / "checkpoints.db", check_same_thread=False)
-    agent = BankAgent(model, registry, banking_tools, SqliteSaver(connection))
+    trace_path = ROOT / "logs" / "agent.jsonl"
+    trace = TraceLogger(trace_path)
+    agent = BankAgent(model, registry, banking_tools, SqliteSaver(connection), trace=trace)
+    prompt = PromptSession(history=FileHistory(str(ROOT / "cli_history")))
 
-    print(f"Bank Agent 已启动（用户 {user_id}，会话 {session_id}），输入 exit 退出。")
+    print(
+        f"Bank Agent 已启动（用户 {user_id}，会话 {session_id}），输入 exit 退出。\n"
+        f"轨迹日志：{trace_path}"
+    )
     try:
         while True:
-            message = input("你：").strip()
+            try:
+                message = prompt.prompt("你：").strip()
+            except (EOFError, KeyboardInterrupt):
+                break
             if message.lower() in {"exit", "quit"}:
                 break
             if message:
-                print("Agent：" + agent.chat(user_id, session_id, message)["response"])
+                try:
+                    response = agent.chat(user_id, session_id, message)["response"]
+                    print("Agent：" + response)
+                except RuntimeError as error:
+                    trace.write(
+                        "agent_error", user_id, session_id,
+                        error_type=type(error).__name__, error=str(error),
+                    )
+                    print(f"Agent：{error}。你可以继续输入或稍后重试。")
     finally:
         connection.close()
 

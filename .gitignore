@@ -9,4 +9,6 @@ actions/otp.db
 bank_agent/checkpoints.db
 bank_agent/actions.db
 bank_agent/otp.db
+bank_agent/cli_history
+bank_agent/logs/
 tools/actions.db

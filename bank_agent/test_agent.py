@@ -36,6 +36,13 @@ class FakeModel:
         self.replies = iter(replies)
 
     def respond(self, messages, tools):
+        if tools and tools[0]["function"]["name"] == "route_to_agent":
+            text = messages[-1]["content"]
+            agent = "operations" if "转账" in text else "account"
+            return {"content": "", "tool_calls": [{
+                "id": "route", "name": "route_to_agent",
+                "arguments": {"agent": agent, "reason": "test route"},
+            }]}
         return next(self.replies)
 
 
@@ -58,6 +65,7 @@ class BankAgentTest(unittest.TestCase):
         ])
         result = agent.chat("U1", "S1", "余额是多少")
         self.assertEqual(result["response"], "余额为 5000.00 元。")
+        self.assertEqual(result["specialist"], "account")
 
     def test_yellow_transfer_waits_for_exact_confirmation(self):
         agent, gateway = self.build([{

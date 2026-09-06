@@ -40,6 +40,8 @@ uv sync --frozen
 
 ## 测试 Agent
 
+macOS / Linux：
+
 ```bash
 # 首次运行：创建本地配置并填写 LLM_API_KEY
 cp .env.example .env
@@ -51,4 +53,19 @@ uv run python mock_bank/app.py
 uv run python -m bank_agent.cli
 ```
 
+Windows PowerShell：
+
+```powershell
+# 首次运行：创建本地配置并填写 LLM_API_KEY
+Copy-Item .env.example .env
+
+# PowerShell 窗口 1
+uv run python mock_bank/app.py
+
+# PowerShell 窗口 2
+uv run python -m bank_agent.cli
+```
+
 `.env` 只保存在本机且已被 Git 忽略；`.env.example` 不包含真实密钥，可以安全提交。
+
+CLI 支持上下方向键翻看输入历史、左右方向键编辑。运行轨迹保存在 `bank_agent/logs/agent.jsonl`。

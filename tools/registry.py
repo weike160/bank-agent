@@ -16,7 +16,10 @@ class ToolRegistry:
             "handler": handler,
         }
 
-    def definitions(self):
+    def definitions(self, names=None):
+        selected = self.tools.items()
+        if names is not None:
+            selected = ((name, self.tools[name]) for name in sorted(names) if name in self.tools)
         return [{
             "type": "function",
             "function": {
@@ -24,7 +27,7 @@ class ToolRegistry:
                 "description": tool["description"],
                 "parameters": tool["parameters"],
             },
-        } for name, tool in self.tools.items()]
+        } for name, tool in selected]
 
     def call(self, name, arguments, user_id, session_id):
         if name not in self.tools:

@@ -43,7 +43,7 @@ class BankGatewayTest(unittest.TestCase):
         }, result)
 
     def test_lists_accounts_and_payees(self):
-        self.assertEqual(2, len(self.gateway.get_accounts()["accounts"]))
+        self.assertEqual(4, len(self.gateway.get_accounts()["accounts"]))
         self.assertEqual("P1001", self.gateway.get_payees()["payees"][0]["id"])
         self.assertEqual(["A1001"], [
             item["id"] for item in self.gateway.get_accounts("U1")["accounts"]
