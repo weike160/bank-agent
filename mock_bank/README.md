@@ -12,18 +12,48 @@ uv run python mock_bank/app.py
 
 服务地址：`http://127.0.0.1:8000`
 
+账户面板：`http://127.0.0.1:8000/admin`
+
 测试是否启动成功：
 
 ```bash
 curl http://127.0.0.1:8000/accounts/A1001
 ```
 
-首次启动会创建 `bank.db`，并生成两个账户 `A1001`（1000.00）和 `A1002`（500.00）、银行卡 `C1001`，以及代扣协议 `D1001`。重启服务会继续使用原数据库。
+首次启动会创建 `bank.db` 和四个测试用户。重启服务会继续使用原数据库。
+
+## 账户面板
+
+启动后打开 `http://127.0.0.1:8000/admin`，可以查看所有测试用户，以及每个用户的账户、余额和状态。刷新页面即可看到转账后的最新余额。
+
+面板只读，不提供直接修改余额或绕过 Agent 安全流程的入口。
+
+## 共享测试服务器
+
+可以部署到 Linux 服务器，供少量可信测试者共享同一个 Mock Bank。公网环境必须设置 API Token：
+
+```bash
+export BANK_API_TOKEN="请替换为足够长的随机值"
+uv run python mock_bank/app.py --host 0.0.0.0
+```
+
+其他测试者在自己的 `.env` 中配置：
+
+```env
+BANK_BASE_URL=https://你的测试域名
+BANK_API_TOKEN=相同的随机值
+BANK_USER_ID=U3
+```
+
+服务器前面必须使用 Nginx 或 Caddy 提供 HTTPS，并通过防火墙限制访问。未设置 Token 时，Mock Bank 会拒绝绑定非本机地址。
+
+当前 `BANK_USER_ID` 仍由测试者选择，共享 Token 也不是正式用户登录。因此只能用于可信人员测试，不能存放真实银行数据或向公众开放。
 
 ## API
 
 ```text
 GET  /accounts/A1001
+GET  /users
 GET  /accounts
 GET  /users/U1/accounts
 GET  /users/U1/payees

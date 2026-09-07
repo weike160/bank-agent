@@ -69,3 +69,5 @@ uv run python -m bank_agent.cli
 `.env` 只保存在本机且已被 Git 忽略；`.env.example` 不包含真实密钥，可以安全提交。
 
 CLI 支持上下方向键翻看输入历史、左右方向键编辑。运行轨迹保存在 `bank_agent/logs/agent.jsonl`。
+
+Mock Bank 启动后，可在 `http://127.0.0.1:8000/admin` 查看所有测试用户和账户。共享服务器的安全配置见 [`mock_bank/README.md`](mock_bank/README.md)。

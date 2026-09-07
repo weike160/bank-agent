@@ -31,6 +31,7 @@ class BankGatewayTest(unittest.TestCase):
     def setUp(self):
         database = Path(self.temp_dir.name) / f"{self._testMethodName}.db"
         Handler.bank = Bank(database)
+        Handler.api_token = None
 
     def test_get_balance_is_normalized(self):
         result = self.gateway.get_balance("A1001")
@@ -49,6 +50,20 @@ class BankGatewayTest(unittest.TestCase):
             item["id"] for item in self.gateway.get_accounts("U1")["accounts"]
         ])
         self.assertEqual([], self.gateway.get_payees("U2")["payees"])
+
+    def test_admin_lists_users(self):
+        users = self.gateway.request("GET", "/users")
+        self.assertEqual(["U1", "U2", "U3", "U4"], [user["id"] for user in users])
+
+    def test_api_token_protects_all_bank_data(self):
+        Handler.api_token = "test-token"
+        with self.assertRaises(GatewayError) as context:
+            self.gateway.get_accounts()
+        self.assertEqual(401, context.exception.status)
+
+        host, port = self.server.server_address
+        authorized = BankGateway(f"http://{host}:{port}", api_token="test-token")
+        self.assertEqual(4, len(authorized.get_accounts()["accounts"]))
 
     def test_transfer_changes_balance_and_transactions(self):
         prepared = self.gateway.prepare_transfer("A1001", "A1002", "25.00", "gateway test")

@@ -1,3 +1,4 @@
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -95,6 +96,11 @@ class BankTest(unittest.TestCase):
         self.assertEqual("1000.00", self.bank.account("A1003")["balance"])
         self.assertEqual("1000.00", self.bank.account("A1004")["balance"])
 
+    def test_admin_user_list_contains_accounts(self):
+        users = self.bank.users()
+        self.assertEqual(["U1", "U2", "U3", "U4"], [user["id"] for user in users])
+        self.assertEqual("A1004", users[3]["accounts"][0]["id"])
+
     def test_data_survives_new_bank_instance(self):
         self.execute_transfer("A1001", "A1002", "10.00")
         restarted_bank = Bank(self.db_path)
@@ -106,6 +112,12 @@ class BankTest(unittest.TestCase):
             self.execute_transfer("A1001", "A1002", "9999.00")
         self.assertEqual("1000.00", self.bank.account("A1001")["balance"])
         self.assertEqual([], self.bank.transactions("A1001"))
+
+    def test_connection_closes_after_context(self):
+        with self.bank.connect() as db:
+            db.execute("SELECT 1")
+        with self.assertRaises(sqlite3.ProgrammingError):
+            db.execute("SELECT 1")
 
 
 if __name__ == "__main__":

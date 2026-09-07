@@ -1,6 +1,7 @@
 import json
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
@@ -77,11 +78,19 @@ class ActionService:
         self.validators = {}
         self.setup()
 
+    @contextmanager
     def connect(self):
         db = sqlite3.connect(self.db_path)
         db.row_factory = sqlite3.Row
         db.execute("PRAGMA foreign_keys = ON")
-        return db
+        try:
+            yield db
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     def setup(self):
         with self.connect() as db:

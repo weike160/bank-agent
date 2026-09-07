@@ -28,7 +28,10 @@ def main():
 
     user_id = os.environ.get("BANK_USER_ID", "U4")
     session_id = os.environ.get("BANK_SESSION_ID", "SES" + uuid.uuid4().hex[:12].upper())
-    gateway = BankGateway(os.environ.get("BANK_BASE_URL", "http://127.0.0.1:8000"))
+    gateway = BankGateway(
+        os.environ.get("BANK_BASE_URL", "http://127.0.0.1:8000"),
+        api_token=os.environ.get("BANK_API_TOKEN"),
+    )
     otp = OTPVerifier(
         lambda user, code: print(f"[仅开发环境] {user} 的验证码：{code}"),
         ROOT / "otp.db",

@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import secrets
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -32,10 +33,18 @@ class OTPVerifier:
     def hash_code(code, salt):
         return hashlib.pbkdf2_hmac("sha256", code.encode(), salt, 100_000)
 
+    @contextmanager
     def connect(self):
         db = sqlite3.connect(self.db_path)
         db.row_factory = sqlite3.Row
-        return db
+        try:
+            yield db
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     def setup(self):
         with self.connect() as db:

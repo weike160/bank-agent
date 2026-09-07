@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 import argparse
+import hmac
 import json
+import os
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -11,6 +14,7 @@ from urllib.parse import parse_qs, urlparse
 
 
 DEFAULT_DB = Path(__file__).with_name("bank.db")
+ADMIN_PAGE = Path(__file__).with_name("admin.html")
 
 
 def now():
@@ -65,11 +69,21 @@ class Bank:
         self.db_path = str(db_path)
         self.setup()
 
+    @contextmanager
     def connect(self):
         db = sqlite3.connect(self.db_path)
         db.row_factory = sqlite3.Row
         db.execute("PRAGMA foreign_keys = ON")
-        return db
+        db.execute("PRAGMA journal_mode = WAL")
+        db.execute("PRAGMA busy_timeout = 5000")
+        try:
+            yield db
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     def setup(self):
         with self.connect() as db:
@@ -230,6 +244,19 @@ class Bank:
             else:
                 rows = db.execute("SELECT * FROM accounts ORDER BY id").fetchall()
         return [account_json(row) for row in rows]
+
+    def users(self):
+        with self.connect() as db:
+            users = [dict(row) for row in db.execute(
+                "SELECT id, name FROM users ORDER BY id"
+            ).fetchall()]
+            accounts = db.execute("SELECT * FROM accounts ORDER BY id").fetchall()
+        accounts_by_user = {user["id"]: [] for user in users}
+        for account in accounts:
+            accounts_by_user[account["user_id"]].append(account_json(account))
+        for user in users:
+            user["accounts"] = accounts_by_user[user["id"]]
+        return users
 
     def account(self, account_id):
         with self.connect() as db:
@@ -544,6 +571,7 @@ class Bank:
 
 class Handler(BaseHTTPRequestHandler):
     bank = None
+    api_token = None
 
     def send_json(self, status, data):
         body = json.dumps(data, ensure_ascii=False).encode()
@@ -552,6 +580,26 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def send_html(self, status, body):
+        content = body.encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(content)))
+        self.end_headers()
+        self.wfile.write(content)
+
+    def authorized(self):
+        if not self.api_token:
+            return True
+        supplied = self.headers.get("Authorization", "").removeprefix("Bearer ")
+        return hmac.compare_digest(supplied, self.api_token)
+
+    def require_authorization(self):
+        if self.authorized():
+            return True
+        self.send_json(401, {"error": "unauthorized"})
+        return False
 
     def read_json(self):
         length = int(self.headers.get("Content-Length", "0"))
@@ -564,8 +612,16 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         parts = [part for part in parsed.path.split("/") if part]
         query = parse_qs(parsed.query)
+        if parts == ["health"]:
+            return self.send_json(200, {"status": "ok"})
+        if parts == ["admin"]:
+            return self.send_html(200, ADMIN_PAGE.read_text(encoding="utf-8"))
+        if not self.require_authorization():
+            return
         try:
-            if parts == ["accounts"]:
+            if parts == ["users"]:
+                result = self.bank.users()
+            elif parts == ["accounts"]:
                 result = self.bank.accounts()
             elif len(parts) == 3 and parts[0] == "users" and parts[2] == "accounts":
                 result = self.bank.accounts(parts[1])
@@ -607,6 +663,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(400, {"error": str(error)})
 
     def do_POST(self):
+        if not self.require_authorization():
+            return
         parts = [part for part in urlparse(self.path).path.split("/") if part]
         try:
             data = self.read_json()
@@ -639,6 +697,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(400, {"error": str(error)})
 
     def do_PUT(self):
+        if not self.require_authorization():
+            return
         parts = [part for part in urlparse(self.path).path.split("/") if part]
         try:
             data = self.read_json()
@@ -661,8 +721,12 @@ def main():
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--db", default=str(DEFAULT_DB))
+    parser.add_argument("--api-token", default=os.environ.get("BANK_API_TOKEN"))
     args = parser.parse_args()
+    if args.host not in {"127.0.0.1", "localhost", "::1"} and not args.api_token:
+        parser.error("--api-token or BANK_API_TOKEN is required for non-localhost binding")
     Handler.bank = Bank(args.db)
+    Handler.api_token = args.api_token
     print(f"Mock bank listening on http://{args.host}:{args.port}")
     ThreadingHTTPServer((args.host, args.port), Handler).serve_forever()
 

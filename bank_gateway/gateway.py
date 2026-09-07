@@ -11,17 +11,21 @@ class GatewayError(Exception):
 
 
 class BankGateway:
-    def __init__(self, base_url="http://127.0.0.1:8000", timeout=5):
+    def __init__(self, base_url="http://127.0.0.1:8000", timeout=5, api_token=None):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self.api_token = api_token
 
     def request(self, method, path, data=None):
         body = json.dumps(data).encode() if data is not None else None
+        headers = {"Content-Type": "application/json"}
+        if self.api_token:
+            headers["Authorization"] = f"Bearer {self.api_token}"
         request = Request(
             self.base_url + path,
             data=body,
             method=method,
-            headers={"Content-Type": "application/json"},
+            headers=headers,
         )
         try:
             with urlopen(request, timeout=self.timeout) as response:

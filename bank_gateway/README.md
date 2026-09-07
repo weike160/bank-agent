@@ -20,6 +20,12 @@ gateway = BankGateway("http://127.0.0.1:8000")
 print(gateway.get_balance("A1001"))
 ```
 
+连接设置了 Token 的共享 Mock Bank：
+
+```python
+gateway = BankGateway("https://你的测试域名", api_token="你的 BANK_API_TOKEN")
+```
+
 可用方法：
 
 ```text
